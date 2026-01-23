@@ -34,10 +34,10 @@ static constexpr int16_t decode_value(uint8_t low_byte, uint8_t high_byte) {
   return value;
 }
 
-// Check if speed value indicates a valid Doppler measurement
+// Check if speed value is meaningful (not sentinel)
 static constexpr bool is_speed_valid(int16_t speed) {
   int16_t abs_speed = speed < 0 ? -speed : speed;
-  return speed != 0 && abs_speed != SPEED_SENTINEL_248 && abs_speed != SPEED_SENTINEL_256;
+  return abs_speed != SPEED_SENTINEL_248 && abs_speed != SPEED_SENTINEL_256;
 }
 
 void RD03DComponent::setup() {
@@ -81,7 +81,7 @@ void RD03DComponent::loop() {
     uint8_t byte = this->read();
     ESP_LOGVV(TAG, "Received byte: 0x%02X, buffer_pos: %d", byte, this->buffer_pos_);
 
-    // Check if we're looking for frame header
+    // Searching for frame header
     if (this->buffer_pos_ < FRAME_HEADER_SIZE) {
       if (byte == FRAME_HEADER[this->buffer_pos_]) {
         this->buffer_[this->buffer_pos_++] = byte;
@@ -98,7 +98,7 @@ void RD03DComponent::loop() {
     this->buffer_[this->buffer_pos_++] = byte;
 
     // Check if we have a complete frame
-    if (this->buffer_pos_ >= FRAME_SIZE) {
+    if (this->buffer_pos_ == FRAME_SIZE) {
       // Validate footer
       if (this->buffer_[FRAME_SIZE - 2] == FRAME_FOOTER[0] &&
           this->buffer_[FRAME_SIZE - 1] == FRAME_FOOTER[1]) {
@@ -113,6 +113,7 @@ void RD03DComponent::loop() {
 }
 
 void RD03DComponent::process_frame_() {
+  // Apply throttle if configured
   if (this->throttle_ > 0) {
     uint32_t now = millis();
     if (now - this->last_publish_time_ < this->throttle_) {
@@ -140,10 +141,8 @@ void RD03DComponent::process_frame_() {
     int16_t speed = decode_value(speed_low, speed_high);
     uint16_t resolution = (res_high << 8) | res_low;
 
-    // Target presence based on coordinates, not speed
-    bool has_position = (x != 0 || y != 0);
-    bool moving = is_speed_valid(speed);
-    bool target_present = has_position;
+    // Presence based only on coordinates
+    bool target_present = (x != 0 || y != 0);
 
     if (target_present) {
       target_count++;
@@ -156,13 +155,6 @@ void RD03DComponent::process_frame_() {
 #ifdef USE_BINARY_SENSOR
     if (this->target_presence_[i] != nullptr) {
       this->target_presence_[i]->publish_state(target_present);
-    }
-#endif
-
-#ifdef USE_BINARY_SENSOR
-    // Optional: motion sensor
-    if (this->target_motion_[i] != nullptr) {
-      this->target_motion_[i]->publish_state(moving);
     }
 #endif
   }
@@ -183,7 +175,8 @@ void RD03DComponent::process_frame_() {
 #ifdef USE_SENSOR
 void RD03DComponent::publish_target_(uint8_t target_num, int16_t x, int16_t y, int16_t speed, uint16_t resolution) {
   TargetSensor &target = this->targets_[target_num];
-  bool valid = (x != 0 || y != 0);
+
+  bool valid = (x != 0 || y != 0); // Only coordinates matter for validity
 
   if (target.x != nullptr) {
     target.x->publish_state(valid ? static_cast<float>(x) : NAN);
@@ -194,7 +187,7 @@ void RD03DComponent::publish_target_(uint8_t target_num, int16_t x, int16_t y, i
   }
 
   if (target.speed != nullptr) {
-    target.speed->publish_state(valid ? static_cast<float>(speed) * 10.0f : NAN);
+    target.speed->publish_state(valid ? static_cast<float>(speed) * 10.0f : NAN); // mm/s
   }
 
   if (target.resolution != nullptr) {
@@ -235,7 +228,6 @@ void RD03DComponent::send_command_(uint16_t command, const uint8_t *data, uint8_
   }
 
   this->write_array(CMD_FRAME_FOOTER, sizeof(CMD_FRAME_FOOTER));
-
   ESP_LOGD(TAG, "Sent command 0x%04X with %d bytes of data", command, data_len);
 }
 
