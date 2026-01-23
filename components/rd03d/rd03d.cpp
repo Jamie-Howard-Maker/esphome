@@ -185,7 +185,7 @@ void RD03DComponent::process_frame_() {
 #ifdef USE_SENSOR
 void RD03DComponent::publish_target_(uint8_t target_num, int16_t x, int16_t y, int16_t speed, uint16_t resolution) {
   TargetSensor &target = this->targets_[target_num];
-  bool valid = is_speed_valid(speed);
+  bool valid =  (x != 0 || y != 0);
 
   // Publish X coordinate (mm) - NaN if target invalid
   if (target.x != nullptr) {
