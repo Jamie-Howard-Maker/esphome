@@ -153,7 +153,7 @@ void RD03DComponent::process_frame_() {
     // FMCW radars detect motion via Doppler; sentinel speed indicates no real target
     bool has_position = (x != 0 || y != 0);
     bool has_valid_speed = is_speed_valid(speed);
-    bool target_present = has_position && has_valid_speed;
+    bool target_present = has_position;
     if (target_present) {
       target_count++;
     }
