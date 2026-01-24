@@ -140,10 +140,10 @@ void RD03DComponent::process_frame_() {
     uint8_t x_high = this->buffer_[offset + 1];
     uint8_t y_low = this->buffer_[offset + 2];
     uint8_t y_high = this->buffer_[offset + 3];
-    uint8_t res_low = this->buffer_[offset + 4];
-    uint8_t res_high = this->buffer_[offset + 5];
-    uint8_t speed_low = this->buffer_[offset + 6];
-    uint8_t speed_high = this->buffer_[offset + 7];
+    uint8_t speed_low = this->buffer_[offset + 4];
+    uint8_t speed_high = this->buffer_[offset + 5];
+    uint8_t res_low = this->buffer_[offset + 6];
+    uint8_t res_high = this->buffer_[offset + 7];
 
     // Decode values per RD-03D format
     int16_t x = decode_value(x_low, x_high);
