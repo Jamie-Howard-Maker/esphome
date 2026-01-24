@@ -44,7 +44,7 @@ static constexpr bool is_speed_valid(int16_t speed) {
 }
 
 void RD03DComponent::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up RD-03D...");
+  ESP_LOGCONFIG(TAG, "Setting up RD-03D Jamie...");
   this->set_timeout(SETUP_TIMEOUT_MS, [this]() { this->apply_config_(); });
 }
 
