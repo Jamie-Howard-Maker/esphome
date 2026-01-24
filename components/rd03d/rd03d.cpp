@@ -43,10 +43,14 @@ static constexpr bool is_speed_valid(int16_t speed) {
   return speed != 0 && abs_speed != SPEED_SENTINEL_248 && abs_speed != SPEED_SENTINEL_256;
 }
 
-void RD03DComponent::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up RD-03D...");
-  this->set_timeout(SETUP_TIMEOUT_MS, [this]() { this->apply_config_(); });
-}
+ESP_LOGCONFIG(TAG, "Setting up RD-03D...");
+  delay(800);  // Give radar time to boot stably
+  this->flush();  // Clear any garbage bytes
+  this->set_timeout(1000, [this]() {  // Increase from 100ms
+    this->apply_config_();
+    delay(200);  // Short pause after command
+    this->flush();  // Clear response/garbage
+  });
 
 void RD03DComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "RD-03D:");
@@ -123,16 +127,19 @@ void RD03DComponent::loop() {
 
 void RD03DComponent::process_frame_() {
   // Apply throttle if configured
-  if (this->throttle_ > 0) {
-    uint32_t now = millis();
-    if (now - this->last_publish_time_ < this->throttle_) {
-      return;
-    }
-    this->last_publish_time_ = now;
-  }
+ // if (this->throttle_ > 0) {
+ //   uint32_t now = millis();
+ //   if (now - this->last_publish_time_ < this->throttle_) {
+ //     return;
+ //   }
+ //   this->last_publish_time_ = now;
+ // }
 
   uint8_t target_count = 0;
-
+  ESP_LOGD(TAG, "Processing frame:");
+  for (uint8_t j = 0; j < FRAME_SIZE; j++) {
+    ESP_LOGD(TAG, "0x%02X ", this->buffer_[j]);
+  }
   for (uint8_t i = 0; i < MAX_TARGETS; i++) {
     // Calculate offset for this target's data
     // Header is 4 bytes, each target is 8 bytes
@@ -163,6 +170,10 @@ void RD03DComponent::process_frame_() {
     bool has_position = (x != 0 || y != 0);
     bool has_valid_speed = (x != 0 || y != 0);
     bool target_present = has_position;
+
+    ESP_LOGD(TAG, "Target %d: x=%d mm, y=%d mm, speed=%d cm/s, res=%u mm, present=%s",
+             i+1, x, y, speed, resolution, (x != 0 || y != 0) ? "yes" : "no");
+    
     if (target_present) {
       target_count++;
     }
