@@ -43,14 +43,10 @@ static constexpr bool is_speed_valid(int16_t speed) {
   return speed != 0 && abs_speed != SPEED_SENTINEL_248 && abs_speed != SPEED_SENTINEL_256;
 }
 
-ESP_LOGCONFIG(TAG, "Setting up RD-03D...");
-  delay(800);  // Give radar time to boot stably
-  this->flush();  // Clear any garbage bytes
-  this->set_timeout(1000, [this]() {  // Increase from 100ms
-    this->apply_config_();
-    delay(200);  // Short pause after command
-    this->flush();  // Clear response/garbage
-  });
+void RD03DComponent::setup() {
+  ESP_LOGCONFIG(TAG, "Setting up RD-03D...");
+  this->set_timeout(SETUP_TIMEOUT_MS, [this]() { this->apply_config_(); });
+}
 
 void RD03DComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "RD-03D:");
@@ -86,40 +82,34 @@ void RD03DComponent::dump_config() {
 void RD03DComponent::loop() {
   while (this->available()) {
     uint8_t byte = this->read();
+    ESP_LOGVV(TAG, "Received byte: 0x%02X, buffer_pos: %d", byte, this->buffer_pos_);
 
-    // ────────────────────────────── Very strong resync ───────────────────────────────
-    if (this->buffer_pos_ == 0) {
-      if (byte == 0xAA) {
+    // Check if we're looking for frame header
+    if (this->buffer_pos_ < FRAME_HEADER_SIZE) {
+      if (byte == FRAME_HEADER[this->buffer_pos_]) {
+        this->buffer_[this->buffer_pos_++] = byte;
+      } else if (byte == FRAME_HEADER[0]) {
+        // Start over if we see a potential new header
         this->buffer_[0] = byte;
         this->buffer_pos_ = 1;
+      } else {
+        this->buffer_pos_ = 0;
       }
-      // else: silently drop everything until we see AA
       continue;
     }
 
+    // Accumulate data bytes
     this->buffer_[this->buffer_pos_++] = byte;
 
-    // Early possible header resync (very important!)
-    if (this->buffer_pos_ >= 2) {
-      if (this->buffer_[this->buffer_pos_-2] == 0xAA && this->buffer_[this->buffer_pos_-1] == 0xFF) {
-        // Looks like new frame started → restart collection
-        this->buffer_[0] = 0xAA;
-        this->buffer_[1] = 0xFF;
-        this->buffer_pos_ = 2;
-      }
-    }
-
-    // We have enough bytes → check if complete frame
-    if (this->buffer_pos_ >= FRAME_SIZE) {
-      if (this->buffer_[FRAME_SIZE - 2] == 0x55 && this->buffer_[FRAME_SIZE - 1] == 0xCC) {
+    // Check if we have a complete frame
+    if (this->buffer_pos_ == FRAME_SIZE) {
+      // Validate footer
+      if (this->buffer_[FRAME_SIZE - 2] == FRAME_FOOTER[0] && this->buffer_[FRAME_SIZE - 1] == FRAME_FOOTER[1]) {
         this->process_frame_();
-      } // else → broken frame, just fall through → will be resynced anyway
-
-      this->buffer_pos_ = 0;   // ← Very important to always reset here!
-    }
-
-    // Safety: never let buffer grow too much
-    if (this->buffer_pos_ >= sizeof(this->buffer_)) {
+      } else {
+        ESP_LOGW(TAG, "Invalid frame footer: 0x%02X 0x%02X (expected 0x55 0xCC)", this->buffer_[FRAME_SIZE - 2],
+                 this->buffer_[FRAME_SIZE - 1]);
+      }
       this->buffer_pos_ = 0;
     }
   }
@@ -127,19 +117,16 @@ void RD03DComponent::loop() {
 
 void RD03DComponent::process_frame_() {
   // Apply throttle if configured
- // if (this->throttle_ > 0) {
- //   uint32_t now = millis();
- //   if (now - this->last_publish_time_ < this->throttle_) {
- //     return;
- //   }
- //   this->last_publish_time_ = now;
- // }
+  if (this->throttle_ > 0) {
+    uint32_t now = millis();
+    if (now - this->last_publish_time_ < this->throttle_) {
+      return;
+    }
+    this->last_publish_time_ = now;
+  }
 
   uint8_t target_count = 0;
-  ESP_LOGD(TAG, "Processing frame:");
-  for (uint8_t j = 0; j < FRAME_SIZE; j++) {
-    ESP_LOGD(TAG, "0x%02X ", this->buffer_[j]);
-  }
+
   for (uint8_t i = 0; i < MAX_TARGETS; i++) {
     // Calculate offset for this target's data
     // Header is 4 bytes, each target is 8 bytes
@@ -168,12 +155,8 @@ void RD03DComponent::process_frame_() {
     // Requires non-zero coordinates AND valid speed (not a sentinel value)
     // FMCW radars detect motion via Doppler; sentinel speed indicates no real target
     bool has_position = (x != 0 || y != 0);
-    bool has_valid_speed = (x != 0 || y != 0);
-    bool target_present = has_position;
-
-    ESP_LOGD(TAG, "Target %d: x=%d mm, y=%d mm, speed=%d cm/s, res=%u mm, present=%s",
-             i+1, x, y, speed, resolution, (x != 0 || y != 0) ? "yes" : "no");
-    
+    bool has_valid_speed = is_speed_valid(speed);
+    bool target_present = has_position && has_valid_speed;
     if (target_present) {
       target_count++;
     }
@@ -205,7 +188,7 @@ void RD03DComponent::process_frame_() {
 #ifdef USE_SENSOR
 void RD03DComponent::publish_target_(uint8_t target_num, int16_t x, int16_t y, int16_t speed, uint16_t resolution) {
   TargetSensor &target = this->targets_[target_num];
-  bool valid = (x != 0 || y != 0);
+  bool valid = is_speed_valid(speed);
 
   // Publish X coordinate (mm) - NaN if target invalid
   if (target.x != nullptr) {
