@@ -43,7 +43,7 @@ static constexpr bool is_speed_valid(int16_t speed) {
   return speed != 0 && abs_speed != SPEED_SENTINEL_248 && abs_speed != SPEED_SENTINEL_256;
 }
 
-ESP_LOGCONFIG(TAG, "Setting up RD-03D...");
+ESP_LOGI(TAG, "Setting up RD-03D...");
   delay(800);  // Give radar time to boot stably
   this->flush();  // Clear any garbage bytes
   this->set_timeout(1000, [this]() {  // Increase from 100ms
