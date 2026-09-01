@@ -29,13 +29,13 @@ CONFIG_SCHEMA = cv.Schema({
 
 async def to_code(config):
     hub = await cg.get_variable(config[CONF_JBD_BMS_BLE_ID])
-    
+
     # Обробка стандартних сенсорів
     for key in ["voltage", "current", "mosfet_temperature", "cell_temperature", "soc", "soh", "cycles", "equilibriumstate", "batterystate", "charge", "capacity"]:
         if key in config:
             sens = await sensor.new_sensor(config[key])
             cg.add(getattr(hub, f"set_{key}_sensor")(sens))
-    
+
     # Обробка списку комірок
     if "cells" in config:
         for i, cell_conf in enumerate(config["cells"]):
