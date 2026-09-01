@@ -52,8 +52,12 @@ void JbdBmsBle::update() {
 }
 
 void JbdBmsBle::decode_data_(const std::vector<uint8_t> &data) {
-    if (data.size() < 100) return;
+    ESP_LOGI(TAG, "Received notify, length: %d", data.size());   // ← add this
 
+    if (data.size() < 100) {
+        ESP_LOGW(TAG, "Packet too short, ignoring");
+        return;
+    }
     float voltage = this->get_int(data, 12, 2, false) / 1000.0f;
     float current = this->get_int(data, 48, 4, true) / 1000.0f;
     float cell_temp = (float)this->get_int(data, 52, 2, false);
