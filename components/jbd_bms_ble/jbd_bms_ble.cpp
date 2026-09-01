@@ -36,6 +36,8 @@ void JbdBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t ga
             if (this->char_notify_ != nullptr) {
                 esp_ble_gattc_register_for_notify(gattc_if, this->parent_->get_remote_bda(), this->char_notify_->handle);
             }
+        }else{
+            ESP_LOGE(TAG, "Service 0xFFE0 not found!");
         }
     } else if (event == ESP_GATTC_NOTIFY_EVT && param->notify.handle == this->char_notify_->handle) {
         std::vector<uint8_t> data(param->notify.value, param->notify.value + param->notify.value_len);
