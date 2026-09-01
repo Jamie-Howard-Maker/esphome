@@ -29,10 +29,10 @@ int32_t JbdBmsBle::get_int(const std::vector<uint8_t> &data, size_t offset, size
 
 void JbdBmsBle::gattc_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param) {
     if (event == ESP_GATTC_SEARCH_CMPL_EVT) {
-        auto *service = this->parent_->get_service(esp32_ble_tracker::ESPBTUUID::from_uint16(0xFFE0));
+        auto *service = this->parent_->get_service(esp32_ble_tracker::ESPBTUUID::from_uint16(0xFF00));
         if (service != nullptr) {
-            this->char_notify_ = service->get_characteristic(esp32_ble_tracker::ESPBTUUID::from_uint16(0xFFE1));
-            this->char_write_ = service->get_characteristic(esp32_ble_tracker::ESPBTUUID::from_uint16(0xFFE2));
+            this->char_notify_ = service->get_characteristic(esp32_ble_tracker::ESPBTUUID::from_uint16(0xFF01));
+            this->char_write_  = service->get_characteristic(esp32_ble_tracker::ESPBTUUID::from_uint16(0xFF02));
             if (this->char_notify_ != nullptr) {
                 esp_ble_gattc_register_for_notify(gattc_if, this->parent_->get_remote_bda(), this->char_notify_->handle);
             }
