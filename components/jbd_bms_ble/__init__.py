@@ -1,23 +1,111 @@
+import logging
+
 import esphome.codegen as cg
-import esphome.config_validation as cv
 from esphome.components import ble_client
-from esphome.const import CONF_ID
+import esphome.config_validation as cv
+from esphome.const import CONF_ID, CONF_PASSWORD, CONF_SERVICE_UUID
 
-# Експортуємо простір імен для sensor.py
-jbd_bms_ble_ns = cg.esphome_ns.namespace('jbd_bms_ble')
-JbdBmsBle = jbd_bms_ble_ns.class_('JbdBmsBle', cg.PollingComponent, ble_client.BLEClientNode)
+_LOGGER = logging.getLogger(__name__)
 
-CONFIG_SCHEMA = cv.All(
-    cv.ensure_list(
-        cv.Schema({
-            cv.GenerateID(): cv.declare_id(JbdBmsBle),
-            cv.Required('ble_client_id'): cv.use_id(ble_client.BLEClient),
-        }).extend(cv.polling_component_schema('10s'))
-    )
+CODEOWNERS = ["@syssi"]
+DEPENDENCIES = ["ble_client"]
+AUTO_LOAD = ["binary_sensor", "button", "select", "sensor", "switch", "text_sensor"]
+MULTI_CONF = True
+
+
+def deprecated_renames(renames: dict[str, str]):
+    def validator(config):
+        config = config.copy()
+        for old, new in renames.items():
+            if old in config:
+                _LOGGER.warning(
+                    "'%s' is deprecated, use '%s' instead. Will be removed in a future release.",
+                    old,
+                    new,
+                )
+                config[new] = config.pop(old)
+        return config
+
+    return validator
+
+
+CONF_JBD_BMS_BLE_ID = "jbd_bms_ble_id"
+CONF_AUTH_TIMEOUT = "auth_timeout"
+CONF_NOTIFY_CHARACTERISTIC_UUID = "notify_characteristic_uuid"
+CONF_CONTROL_CHARACTERISTIC_UUID = "control_characteristic_uuid"
+
+jbd_bms_ble_ns = cg.esphome_ns.namespace("jbd_bms_ble")
+JbdBmsBle = jbd_bms_ble_ns.class_(
+    "JbdBmsBle", ble_client.BLEClientNode, cg.PollingComponent
 )
 
+
+def validate_password(value):
+    """Validate password according to JBD BMS requirements."""
+    if not value:
+        return value
+
+    # Must be exactly 6 characters
+    if len(value) != 6:
+        raise cv.Invalid("Password must be exactly 6 characters long")
+
+    # Only allow alphanumeric characters (0-9, a-z, A-Z)
+    allowed_chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    for char in value:
+        if char not in allowed_chars:
+            raise cv.Invalid(
+                f"Password contains invalid character '{char}'. Only alphanumeric characters (0-9, a-z, A-Z) are allowed"
+            )
+
+    return value
+
+
+JBD_BMS_BLE_COMPONENT_SCHEMA = cv.Schema(
+    {
+        cv.GenerateID(CONF_JBD_BMS_BLE_ID): cv.use_id(JbdBmsBle),
+    }
+)
+
+CONFIG_SCHEMA = cv.All(
+    cv.require_esphome_version(2025, 11, 0),
+    cv.Schema(
+        {
+            cv.GenerateID(): cv.declare_id(JbdBmsBle),
+            cv.Optional(CONF_SERVICE_UUID, default=0xFF00): cv.int_range(
+                min=0, max=0xFFFF
+            ),
+            cv.Optional(CONF_NOTIFY_CHARACTERISTIC_UUID, default=0xFF01): cv.int_range(
+                min=0, max=0xFFFF
+            ),
+            cv.Optional(CONF_CONTROL_CHARACTERISTIC_UUID, default=0xFF02): cv.int_range(
+                min=0, max=0xFFFF
+            ),
+            cv.Optional(CONF_PASSWORD, default=""): cv.All(
+                cv.string_strict, validate_password
+            ),
+            cv.Optional(
+                CONF_AUTH_TIMEOUT, default="10s"
+            ): cv.positive_time_period_milliseconds,
+        }
+    )
+    .extend(ble_client.BLE_CLIENT_SCHEMA)
+    .extend(cv.polling_component_schema("2s")),
+)
+
+
 async def to_code(config):
-    for conf in config:
-        var = cg.new_Pvariable(conf[CONF_ID])
-        await cg.register_component(var, conf)
-        await ble_client.register_ble_node(var, conf)
+    var = cg.new_Pvariable(config[CONF_ID])
+    await cg.register_component(var, config)
+    await ble_client.register_ble_node(var, config)
+
+    cg.add(var.set_service_uuid(config[CONF_SERVICE_UUID]))
+    cg.add(var.set_notify_characteristic_uuid(config[CONF_NOTIFY_CHARACTERISTIC_UUID]))
+    cg.add(
+        var.set_control_characteristic_uuid(config[CONF_CONTROL_CHARACTERISTIC_UUID])
+    )
+
+    if CONF_PASSWORD in config and config[CONF_PASSWORD]:
+        cg.add(var.set_password(config[CONF_PASSWORD]))
+
+    if CONF_AUTH_TIMEOUT in config:
+        cg.add(var.set_authentication_timeout(config[CONF_AUTH_TIMEOUT]))
