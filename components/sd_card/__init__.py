@@ -162,7 +162,7 @@ else:
 
     if not config[CONF_MODE_1BIT]:
         cg.add(var.set_data1_pin(config[CONF_DATA1_PIN]))
-        cg.add(var.set_DATA2_PIN]))
+        cg.add(var.set_DATA2_PIN])
         cg.add(var.set_data3_pin(config[CONF_DATA3_PIN]))
 
     if (CONF_POWER_CTRL_PIN in config):
