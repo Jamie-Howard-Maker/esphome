@@ -141,28 +141,28 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
-    cg.add(var.set_clk_pin(config[CONF_CLK_PIN]))
+cg.add(var.set_clk_pin(config[CONF_CLK_PIN]))
 
-    if config[CONF_INTERFACE] == "sdspi":
+if config[CONF_INTERFACE] == "sdspi":
 
-        cg.add(var.set_use_spi(True))
+    cg.add(var.set_use_spi(True))
 
-        cg.add(var.set_mosi_pin(config[CONF_MOSI_PIN]))
-        cg.add(var.set_miso_pin(config[CONF_MISO_PIN]))
-        cg.add(var.set_cs_pin(config[CONF_CS_PIN]))
+    cg.add(var.set_mosi_pin(config[CONF_MOSI_PIN]))
+    cg.add(var.set_miso_pin(config[CONF_MISO_PIN]))
+    cg.add(var.set_cs_pin(config[CONF_CS_PIN]))
 
-    else:
+else:
 
-        cg.add(var.set_use_spi(False))
+    cg.add(var.set_use_spi(False))
 
-        cg.add(var.set_mode_1bit(config[CONF_MODE_1BIT]))
+    cg.add(var.set_mode_1bit(config[CONF_MODE_1BIT]))
 
-        cg.add(var.set_cmd_pin(config[CONF_CMD_PIN]))
-        cg.add(var.set_data0_pin(config[CONF_DATA0_PIN]))
+    cg.add(var.set_cmd_pin(config[CONF_CMD_PIN]))
+    cg.add(var.set_data0_pin(config[CONF_DATA0_PIN]))
 
-        if not configcg.add(var.set_data1_pin(config[CONF_DATA1_PIN]))
-            cg.add(var.set_data2_pin(config[CONF_DATA2_PIN]))
-            cg.add(var.set_data3_pin(config[CONF_DATA3_PIN]))
+    if not config[CONF_MODE_1BIT]:
+        cg.add(var.set_data1_pin(config[CONFdd(var.set_data2_pin(config[CONF_DATA2_PIN]))
+        cg.add(var.set_data3_pin(config[CONF_DATA3_PIN]))
 
     if (CONF_POWER_CTRL_PIN in config):
         power_ctrl = await cg.gpio_pin_expression(config[CONF_POWER_CTRL_PIN])
