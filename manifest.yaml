@@ -1,0 +1,6 @@
+name: "Jamie-Howard-Maker ESPHome Components"
+version: "1.0.0"
+files:
+  - components/can_publisher/**
+  - components/victron_ble/**
+  - components/jbd_bms_ble/**
