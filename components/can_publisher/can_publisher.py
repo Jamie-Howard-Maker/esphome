@@ -1,6 +1,5 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import sensor
 from esphome.const import CONF_ID
 
 can_publisher_ns = cg.esphome_ns.namespace("can_publisher")
@@ -12,4 +11,4 @@ CONFIG_SCHEMA = cv.Schema({
 
 def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
-    cg.add(var)
+    cg.register_component(var)
