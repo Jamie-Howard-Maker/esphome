@@ -6,6 +6,31 @@ namespace can_publisher {
 
 static const char *const TAG = "can_publisher";
 
+void CANPublisher::start_frame(uint32_t can_id) {
+  this->current_frame_ = FrameConfig();
+  this->current_frame_.can_id = can_id;
+}
+
+void CANPublisher::add_sensor_value(sensor::Sensor *sens, float scale, float offset) {
+  ValueSource src;
+  src.sensor = sens;
+  src.scale = scale;
+  src.offset = offset;
+  this->current_frame_.values.push_back(src);
+}
+
+void CANPublisher::add_binary_sensor_value(binary_sensor::BinarySensor *bsens, float scale, float offset) {
+  ValueSource src;
+  src.binary_sensor = bsens;
+  src.scale = scale;
+  src.offset = offset;
+  this->current_frame_.values.push_back(src);
+}
+
+void CANPublisher::end_frame() {
+  this->frames_.push_back(this->current_frame_);
+}
+
 void CANPublisher::setup() {
   ESP_LOGCONFIG(TAG, "Setting up CAN Publisher...");
   ESP_LOGCONFIG(TAG, "  Number of frames: %d", this->frames_.size());
@@ -38,11 +63,11 @@ void CANPublisher::send_frame_(const FrameConfig &frame) {
 
   for (size_t i = 0; i < frame.values.size() && i < 4; i++) {
     int16_t val = this->get_value_(frame.values[i]);
-    data[i * 2]     = (val >> 8) & 0xFF;  // high byte
-    data[i * 2 + 1] = val & 0xFF;         // low byte
+    data[i * 2]     = (val >> 8) & 0xFF;
+    data[i * 2 + 1] = val & 0xFF;
   }
 
-  auto err = this->canbus_->send_data(frame.can_id, false, data);  // standard 11-bit ID
+  auto err = this->canbus_->send_data(frame.can_id, false, data);
 
   if (this->log_frames_) {
     if (err == canbus::ERROR_OK) {
