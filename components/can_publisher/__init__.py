@@ -61,16 +61,18 @@ async def to_code(config):
     cg.add(var.set_log_frames(config[CONF_LOG_FRAMES]))
 
     for frame_conf in config[CONF_FRAMES]:
-        values = []
+        can_id = frame_conf[CONF_CAN_ID]
+        cg.add(var.start_frame(can_id))
+
         for val in frame_conf[CONF_VALUES]:
             scale = val[CONF_SCALE]
             offset = val[CONF_OFFSET]
 
             if CONF_SENSOR in val:
                 sens = await cg.get_variable(val[CONF_SENSOR])
-                values.append((sens, None, scale, offset))
+                cg.add(var.add_sensor_value(sens, scale, offset))
             else:
                 bsens = await cg.get_variable(val[CONF_BINARY_SENSOR])
-                values.append((None, bsens, scale, offset))
+                cg.add(var.add_binary_sensor_value(bsens, scale, offset))
 
-        cg.add(var.add_frame(frame_conf[CONF_CAN_ID], values))
+        cg.add(var.end_frame())
