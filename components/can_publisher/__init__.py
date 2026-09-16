@@ -2,6 +2,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import CONF_ID
 from esphome.components import canbus, sensor, binary_sensor
+from esphome.components.canbus import CanbusComponent
 
 DEPENDENCIES = ["canbus"]
 
@@ -42,7 +43,7 @@ CONFIG_SCHEMA = (
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(CANPublisher),
-            cv.Required(CONF_CANBUS_ID): cv.use_id(canbus.Canbus),
+            cv.Required(CONF_CANBUS_ID): cv.use_id(CanbusComponent),
             cv.Optional(CONF_UPDATE_INTERVAL, default="1s"): cv.update_interval,
             cv.Optional(CONF_LOG_FRAMES, default=False): cv.boolean,
             cv.Required(CONF_FRAMES): cv.ensure_list(FRAME_SCHEMA),
