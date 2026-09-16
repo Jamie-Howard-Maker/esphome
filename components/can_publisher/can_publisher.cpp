@@ -76,7 +76,9 @@ void CANPublisher::send_frame_(const FrameConfig &frame) {
                data[0], data[1], data[2], data[3],
                data[4], data[5], data[6], data[7]);
     } else {
-      ESP_LOGW(TAG, "TX 0x%03X failed (err=%d)", frame.can_id, err);
+      ESP_LOGW(TAG, "TX 0x%03X failed (err=%d) %02X %02X %02X %02X %02X %02X %02X %02X", frame.can_id, err,
+               data[0], data[1], data[2], data[3],
+               data[4], data[5], data[6], data[7]);
     }
   }
 }
