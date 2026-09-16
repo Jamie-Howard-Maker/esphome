@@ -19,8 +19,8 @@ struct ValueSource {
 };
 
 struct FrameConfig {
-  uint32_t can_id;
-  std::vector<ValueSource> values;  // max 4
+  uint32_t can_id{0};
+  std::vector<ValueSource> values;
 };
 
 class CANPublisher : public PollingComponent {
@@ -28,19 +28,11 @@ class CANPublisher : public PollingComponent {
   void set_canbus(canbus::Canbus *canbus) { this->canbus_ = canbus; }
   void set_log_frames(bool log) { this->log_frames_ = log; }
 
-  void add_frame(uint32_t can_id, const std::vector<std::tuple<sensor::Sensor*, binary_sensor::BinarySensor*, float, float>> &vals) {
-    FrameConfig frame;
-    frame.can_id = can_id;
-    for (auto &v : vals) {
-      ValueSource src;
-      src.sensor = std::get<0>(v);
-      src.binary_sensor = std::get<1>(v);
-      src.scale = std::get<2>(v);
-      src.offset = std::get<3>(v);
-      frame.values.push_back(src);
-    }
-    this->frames_.push_back(frame);
-  }
+  // Called from Python
+  void start_frame(uint32_t can_id);
+  void add_sensor_value(sensor::Sensor *sens, float scale, float offset);
+  void add_binary_sensor_value(binary_sensor::BinarySensor *bsens, float scale, float offset);
+  void end_frame();
 
   void setup() override;
   void update() override;
@@ -50,6 +42,7 @@ class CANPublisher : public PollingComponent {
   canbus::Canbus *canbus_{nullptr};
   bool log_frames_{false};
   std::vector<FrameConfig> frames_;
+  FrameConfig current_frame_;   // temporary while building
 
   void send_frame_(const FrameConfig &frame);
   int16_t get_value_(const ValueSource &src);
