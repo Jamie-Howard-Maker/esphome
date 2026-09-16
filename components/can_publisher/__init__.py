@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import CONF_ID
-from esphome.components import canbus
+from esphome.components import canbus, sensor, binary_sensor
 
 DEPENDENCIES = ["canbus"]
 
@@ -19,25 +19,37 @@ CONF_OFFSET = "offset"
 can_publisher_ns = cg.esphome_ns.namespace("can_publisher")
 CANPublisher = can_publisher_ns.class_("CANPublisher", cg.PollingComponent)
 
-VALUE_SCHEMA = cv.Schema({
-    cv.Optional(CONF_SENSOR): cv.use_id(cg.Sensor),
-    cv.Optional(CONF_BINARY_SENSOR): cv.use_id(cg.BinarySensor),
-    cv.Optional(CONF_SCALE, default=1.0): cv.float_,
-    cv.Optional(CONF_OFFSET, default=0.0): cv.float_,
-})
+VALUE_SCHEMA = cv.Schema(
+    {
+        cv.Optional(CONF_SENSOR): cv.use_id(sensor.Sensor),
+        cv.Optional(CONF_BINARY_SENSOR): cv.use_id(binary_sensor.BinarySensor),
+        cv.Optional(CONF_SCALE, default=1.0): cv.float_,
+        cv.Optional(CONF_OFFSET, default=0.0): cv.float_,
+    },
+    cv.has_exactly_one_key(CONF_SENSOR, CONF_BINARY_SENSOR),
+)
 
-FRAME_SCHEMA = cv.Schema({
-    cv.Required(CONF_CAN_ID): cv.int_range(min=0, max=0x7FF),
-    cv.Required(CONF_VALUES): cv.All(cv.ensure_list(VALUE_SCHEMA), cv.Length(min=1, max=4)),
-})
+FRAME_SCHEMA = cv.Schema(
+    {
+        cv.Required(CONF_CAN_ID): cv.int_range(min=0, max=0x7FF),
+        cv.Required(CONF_VALUES): cv.All(
+            cv.ensure_list(VALUE_SCHEMA), cv.Length(min=1, max=4)
+        ),
+    }
+)
 
-CONFIG_SCHEMA = cv.Schema({
-    cv.GenerateID(): cv.declare_id(CANPublisher),
-    cv.Required(CONF_CANBUS_ID): cv.use_id(canbus.Canbus),
-    cv.Optional(CONF_UPDATE_INTERVAL, default="1s"): cv.update_interval,
-    cv.Optional(CONF_LOG_FRAMES, default=False): cv.boolean,
-    cv.Required(CONF_FRAMES): cv.ensure_list(FRAME_SCHEMA),
-}).extend(cv.COMPONENT_SCHEMA)
+CONFIG_SCHEMA = (
+    cv.Schema(
+        {
+            cv.GenerateID(): cv.declare_id(CANPublisher),
+            cv.Required(CONF_CANBUS_ID): cv.use_id(canbus.Canbus),
+            cv.Optional(CONF_UPDATE_INTERVAL, default="1s"): cv.update_interval,
+            cv.Optional(CONF_LOG_FRAMES, default=False): cv.boolean,
+            cv.Required(CONF_FRAMES): cv.ensure_list(FRAME_SCHEMA),
+        }
+    )
+    .extend(cv.COMPONENT_SCHEMA)
+)
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
@@ -47,15 +59,17 @@ async def to_code(config):
     cg.add(var.set_canbus(canbus_var))
     cg.add(var.set_log_frames(config[CONF_LOG_FRAMES]))
 
-    for frame in config[CONF_FRAMES]:
+    for frame_conf in config[CONF_FRAMES]:
         values = []
-        for val in frame[CONF_VALUES]:
+        for val in frame_conf[CONF_VALUES]:
             scale = val[CONF_SCALE]
             offset = val[CONF_OFFSET]
+
             if CONF_SENSOR in val:
                 sens = await cg.get_variable(val[CONF_SENSOR])
                 values.append((sens, None, scale, offset))
             else:
                 bsens = await cg.get_variable(val[CONF_BINARY_SENSOR])
                 values.append((None, bsens, scale, offset))
-        cg.add(var.add_frame(frame[CONF_CAN_ID], values))
+
+        cg.add(var.add_frame(frame_conf[CONF_CAN_ID], values))
