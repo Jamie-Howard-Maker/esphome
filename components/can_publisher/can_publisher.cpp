@@ -1,7 +1,11 @@
 #include "can_publisher.h"
 #include "esphome/core/log.h"
-using namespace esphome::modbus;
+#include "esphome/components/modbus/modbus_controller.h"
+#include "driver/twai.h"
 
+using esphome::modbus::ModbusController;
+
+// These come from your YAML
 extern ModbusController *ws8;
 extern ModbusController *ws16;
 
