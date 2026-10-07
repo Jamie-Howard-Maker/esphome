@@ -83,5 +83,49 @@ void CANPublisher::send_frame_(const FrameConfig &frame) {
   }
 }
 
+void CANPublisher::handle_rx() {
+    twai_message_t msg;
+
+    // Non-blocking receive
+    if (twai_receive(&msg, 0) == ESP_OK) {
+        ESP_LOGI("CAN_RX", "RX ID 0x%03X DLC=%d", msg.identifier, msg.data_length_code);
+
+        process_command(msg.identifier, msg.data, msg.data_length_code);
+    }
+}
+void CANPublisher::process_command(uint32_t id, const uint8_t *data, uint8_t len) {
+    if (len < 1) return;
+
+    uint8_t cmd = data[0];
+
+    // ─────────────────────────────────────────────
+    // WS8 board (address 100 in your YAML)
+    // CAN IDs 0x300–0x307
+    // ─────────────────────────────────────────────
+    if (id >= 0x300 && id <= 0x307) {
+        uint8_t relay = id - 0x300 + 1;
+        bool state = (cmd == 0x01);
+
+        ESP_LOGI("CAN_CMD", "WS8 Relay %d → %s", relay, state ? "ON" : "OFF");
+
+        modbus::Modbus::get()->write_coil(ws8, relay, state);
+        return;
+    }
+
+    // ─────────────────────────────────────────────
+    // WS16 board (address 101 in your YAML)
+    // CAN IDs 0x400–0x40F
+    // ─────────────────────────────────────────────
+    if (id >= 0x400 && id <= 0x40F) {
+        uint8_t relay = id - 0x400 + 1;
+        bool state = (cmd == 0x01);
+
+        ESP_LOGI("CAN_CMD", "WS16 Relay %d → %s", relay, state ? "ON" : "OFF");
+
+        modbus::Modbus::get()->write_coil(ws16, relay, state);
+        return;
+    }
+}
+
 }  // namespace can_publisher
 }  // namespace esphome
