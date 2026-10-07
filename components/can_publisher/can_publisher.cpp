@@ -1,24 +1,24 @@
 #include "can_publisher.h"
 #include "esphome/core/log.h"
 // Modbus
-#include "esphome/components/modbus/modbus.h"
-#include "esphome/components/modbus/modbus_controller.h"
+//#include "esphome/components/modbus/modbus.h"
+//#include "esphome/components/modbus/modbus_controller.h"
 
 // ESP-IDF TWAI CAN driver
-#include "driver/twai.h"
+//#include "driver/twai.h"
 
 
 namespace esphome {
 namespace can_publisher {
 static const char *const TAG = "can_publisher";
-using esphome::modbus::ModbusController;
+//using esphome::modbus::ModbusController;
 
 // These come from YAML:
 // modbus_controller:
 //   - id: ws8
 //   - id: ws16
-extern ModbusController *ws8;
-extern ModbusController *ws16;
+//extern ModbusController *ws8;
+//extern ModbusController *ws16;
 
 void CANPublisher::start_frame(uint32_t can_id) {
   this->current_frame_ = FrameConfig();
@@ -55,7 +55,7 @@ void CANPublisher::update() {
   for (const auto &frame : this->frames_) {
     this->send_frame_(frame);
   }
-  handle_rx();
+  //handle_rx();
 }
 
 int16_t CANPublisher::get_value_(const ValueSource &src) {
@@ -97,7 +97,7 @@ void CANPublisher::send_frame_(const FrameConfig &frame) {
     }
   }
 }
-
+/*
 void CANPublisher::handle_rx() {
     twai_message_t msg;
 
@@ -129,6 +129,6 @@ void CANPublisher::process_command(uint32_t id, const uint8_t *data, uint8_t len
         return;
     }
 }
-
+*/
 }  // namespace can_publisher
 }  // namespace esphome
