@@ -25,6 +25,9 @@ struct FrameConfig {
 
 class CANPublisher : public PollingComponent {
  public:
+  void handle_rx();
+  void process_command(uint32_t id, const uint8_t *data, uint8_t len);
+
   void set_canbus(canbus::Canbus *canbus) { this->canbus_ = canbus; }
   void set_log_frames(bool log) { this->log_frames_ = log; }
 
