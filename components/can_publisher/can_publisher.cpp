@@ -1,17 +1,24 @@
 #include "can_publisher.h"
 #include "esphome/core/log.h"
+// Modbus
+#include "esphome/components/modbus/modbus.h"
 #include "esphome/components/modbus/modbus_controller.h"
+
+// ESP-IDF TWAI CAN driver
 #include "driver/twai.h"
 
-using esphome::modbus::ModbusController;
-
-// These come from your YAML
-extern ModbusController *ws8;
-extern ModbusController *ws16;
 
 namespace esphome {
 namespace can_publisher {
 static const char *const TAG = "can_publisher";
+using esphome::modbus::ModbusController;
+
+// These come from YAML:
+// modbus_controller:
+//   - id: ws8
+//   - id: ws16
+extern ModbusController *ws8;
+extern ModbusController *ws16;
 
 void CANPublisher::start_frame(uint32_t can_id) {
   this->current_frame_ = FrameConfig();
