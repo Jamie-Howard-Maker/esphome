@@ -41,6 +41,7 @@ void CANPublisher::update() {
   for (const auto &frame : this->frames_) {
     this->send_frame_(frame);
   }
+  handle_rx();
 }
 
 int16_t CANPublisher::get_value_(const ValueSource &src) {
