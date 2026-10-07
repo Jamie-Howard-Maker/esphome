@@ -3,7 +3,8 @@
 
 namespace esphome {
 namespace can_publisher {
-
+extern modbus::ModbusController *ws8;
+extern modbus::ModbusController *ws16;
 static const char *const TAG = "can_publisher";
 
 void CANPublisher::start_frame(uint32_t can_id) {
