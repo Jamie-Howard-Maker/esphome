@@ -1,10 +1,12 @@
 #include "can_publisher.h"
 #include "esphome/core/log.h"
+using namespace esphome::modbus;
+
+extern ModbusController *ws8;
+extern ModbusController *ws16;
 
 namespace esphome {
 namespace can_publisher {
-extern modbus::ModbusController *ws8;
-extern modbus::ModbusController *ws16;
 static const char *const TAG = "can_publisher";
 
 void CANPublisher::start_frame(uint32_t can_id) {
