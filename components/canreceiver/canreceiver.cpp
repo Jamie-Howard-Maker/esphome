@@ -10,13 +10,14 @@ void CanReceiver::loop() {
   if (this->bus_ == nullptr)
     return;
 
-  esp32_can::CanFrame frame;
-  while (this->bus_->receive(&frame)) {
+  canbus::CanFrame frame;
+  // ESP32Can inherits from canbus::Canbus, so we use read_frame()
+  while (this->bus_->read_frame(&frame)) {
     this->process_frame(frame);
   }
 }
 
-void CanReceiver::process_frame(const esp32_can::CanFrame &frame) {
+void CanReceiver::process_frame(const canbus::CanFrame &frame) {
   if (frame.data.size() < 4)
     return;
 
@@ -46,11 +47,11 @@ void CanReceiver::execute_mapping(const CanMapping &m, uint8_t cmd,
 
   if (m.type == "shelly_channel") {
     if (m.script != nullptr && cmd == 0x01) {  // Set brightness
-      uint8_t ch = target;
       if (value > 100)
         value = 100;
-      ESP_LOGD(TAG, "Shelly channel: ch=%u val=%u", ch, value);
-      m.script->execute(ch, value);
+      ESP_LOGD(TAG, "Shelly channel: tgt=%u val=%u", target, value);
+      // Script<> has no parameters in this binding, so just execute()
+      m.script->execute();
     }
     return;
   }
@@ -60,7 +61,7 @@ void CanReceiver::execute_mapping(const CanMapping &m, uint8_t cmd,
       if (value > 100)
         value = 100;
       ESP_LOGD(TAG, "Shelly all: val=%u", value);
-      m.script->execute(value);
+      m.script->execute();
     }
     return;
   }
@@ -99,14 +100,14 @@ void CanReceiver::execute_mapping(const CanMapping &m, uint8_t cmd,
   if (m.type == "modbus_write") {
     if (m.ctrl != nullptr && cmd == 0x07) {
       ESP_LOGD(TAG, "Modbus write: reg=%u val=%u", m.reg, value);
-      m.ctrl->write_single_coil(m.reg, value != 0);
+      m.ctrl->write_single_register(m.reg, value);
     }
     return;
   }
 
   if (m.type == "script") {
     if (m.script != nullptr && cmd == 0x03) {
-      ESP_LOGD(TAG, "Script execute: target=%u val=%u", target, value);
+      ESP_LOGD(TAG, "Script execute: tgt=%u val=%u", target, value);
       m.script->execute();
     }
     return;
