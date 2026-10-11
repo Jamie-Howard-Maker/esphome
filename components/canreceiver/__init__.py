@@ -31,12 +31,12 @@ CAN_RECEIVER_TYPES = [
     "script",
 ]
 
-
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(CanReceiver),
+        # MATCHES your YAML: canbus: - platform: esp32_can, id: can_bus
         cv.Required(CONF_CANBUS_ID): cv.use_id(
-            cg.esphome_ns.namespace("canbus").class_("Canbus")
+            cg.esphome_ns.namespace("esp32_can").class_("ESP32Can")
         ),
         cv.Optional(CONF_MAPPINGS, default=[]): cv.ensure_list(
             cv.Schema(
