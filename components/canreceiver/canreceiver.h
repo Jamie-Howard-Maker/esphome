@@ -1,7 +1,7 @@
 #pragma once
 
 #include "esphome/core/component.h"
-#include "esphome/components/canbus/canbus.h"
+#include "esphome/components/esp32_can/esp32_can.h"
 #include "esphome/components/script/script.h"
 #include "esphome/components/light/light_state.h"
 #include "esphome/components/switch/switch.h"
@@ -14,7 +14,7 @@ namespace canreceiver {
 struct CanMapping {
   uint32_t can_id;
   std::string type;
-  script::Script *script;
+  script::Script<> *script;                 // Script with no parameters
   light::LightState *light;
   switch_::Switch *sw;
   number::Number *num;
@@ -24,10 +24,11 @@ struct CanMapping {
 
 class CanReceiver : public Component {
  public:
-  void set_canbus(canbus::CANBus *bus) { this->bus_ = bus; }
+  // Use ESP32Can, not generic CANBus
+  void set_canbus(esp32_can::ESP32Can *bus) { this->bus_ = bus; }
 
   void add_mapping(uint32_t can_id, const std::string &type,
-                   script::Script *script, light::LightState *light,
+                   script::Script<> *script, light::LightState *light,
                    switch_::Switch *sw, number::Number *num,
                    modbus_controller::ModbusController *ctrl, uint16_t reg) {
     CanMapping m;
@@ -45,13 +46,13 @@ class CanReceiver : public Component {
   void loop() override;
 
  protected:
-  canbus::CANBus *bus_{nullptr};
+  esp32_can::ESP32Can *bus_{nullptr};
   std::vector<CanMapping> mappings_;
 
-  void process_frame(const canbus::CANFrame &frame);
+  void process_frame(const esp32_can::CanFrame &frame);
   void execute_mapping(const CanMapping &m, uint8_t cmd, uint8_t target,
                        uint8_t value, uint8_t flags);
 };
 
-}  // namespace can_receiver
+}  // namespace canreceiver
 }  // namespace esphome
