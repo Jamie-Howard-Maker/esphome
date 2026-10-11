@@ -6,32 +6,51 @@ namespace canreceiver {
 
 static const char *const TAG = "canreceiver";
 
-void CanReceiver::loop() {
-  if (this->bus_ == nullptr)
+void CanReceiver::setup() {
+  if (this->bus_ == nullptr) {
+    ESP_LOGW(TAG, "No CAN bus configured for canreceiver");
     return;
-
-  canbus::CanFrame frame;
-
-  // read_frame() is on canbus::Canbus
-  while (this->bus_->read_frame(&frame)) {
-    this->process_frame(frame);
   }
+
+  // Use the modern callback API instead of read_frame/receive
+  this->bus_->add_callback(
+      [this](uint32_t can_id, bool extended, bool rtr, const std::vector<uint8_t> &data) {
+        (void) extended;
+        (void) rtr;
+        this->process_frame(can_id, data);
+      });
 }
 
-void CanReceiver::process_frame(const canbus::CanFrame &frame) {
-  // Assume at least 4 bytes in data[]
-  uint8_t cmd    = frame.data[0];
-  uint8_t target = frame.data[1];
-  uint8_t value  = frame.data[2];
-  uint8_t flags  = frame.data[3];
+void CanReceiver::add_mapping(uint32_t can_id, const std::string &type,
+                              script::Script<> *script, light::LightState *light,
+                              switch_::Switch *sw, number::Number *number,
+                              modbus_controller::ModbusController *ctrl,
+                              uint16_t reg) {
+  CanMapping m;
+  m.can_id = can_id;
+  m.type = type;
+  m.script = script;
+  m.light = light;
+  m.sw = sw;
+  m.number = number;
+  m.ctrl = ctrl;
+  m.reg = reg;
+  this->mappings_.push_back(m);
+}
 
-  ESP_LOGV(TAG, "RX ID=0x%03X CMD=0x%02X TGT=%u VAL=%u FLG=0x%02X",
-           frame.can_id, cmd, target, value, flags);
+void CanReceiver::process_frame(uint32_t can_id,
+                                const std::vector<uint8_t> &data) {
+  if (data.size() < 4)
+    return;
+
+  uint8_t cmd = data[0];
+  uint8_t target = data[1];
+  uint8_t value = data[2];
+  uint8_t flags = data[3];
 
   for (auto &m : this->mappings_) {
-    if (m.can_id == frame.can_id) {
+    if (m.can_id == can_id) {
       this->execute_mapping(m, cmd, target, value, flags);
-      return;
     }
   }
 }
@@ -39,72 +58,56 @@ void CanReceiver::process_frame(const canbus::CanFrame &frame) {
 void CanReceiver::execute_mapping(const CanMapping &m, uint8_t cmd,
                                   uint8_t target, uint8_t value,
                                   uint8_t flags) {
+  (void) flags;
+
+  // Types are the same strings you use in YAML: shelly_channel, shelly_all, etc.
   if (m.type == "shelly_channel") {
-    if (m.script != nullptr && cmd == 0x01) {
-      if (value > 100)
-        value = 100;
-      ESP_LOGD(TAG, "Shelly channel: tgt=%u val=%u", target, value);
-      m.script->execute();
-    }
-    return;
-  }
-
-  if (m.type == "shelly_all") {
-    if (m.script != nullptr && cmd == 0x01) {
-      if (value > 100)
-        value = 100;
-      ESP_LOGD(TAG, "Shelly all: val=%u", value);
-      m.script->execute();
-    }
-    return;
-  }
-
-  if (m.type == "neopixel_brightness") {
+    // per‑channel brightness via light + optional script
     if (m.light != nullptr && cmd == 0x01) {
-      float br = value / 100.0f;
-      ESP_LOGD(TAG, "NeoPixel brightness: val=%u → %f", value, br);
       auto call = m.light->make_call();
-      call.set_brightness(br);
+      call.set_brightness(value / 255.0f);
       call.perform();
     }
-    return;
-  }
-
-  if (m.type == "switch_toggle") {
-    if (m.sw != nullptr && cmd == 0x02) {
-      ESP_LOGD(TAG, "Switch toggle: val=%u", value);
-      if (value)
-        m.sw->turn_on();
-      else
-        m.sw->turn_off();
-    }
-    return;
-  }
-
-  if (m.type == "number_set") {
-    if (m.num != nullptr && cmd == 0x04) {
-      float v = value;
-      ESP_LOGD(TAG, "Number set: val=%u", value);
-      m.num->publish_state(v);
-    }
-    return;
-  }
-
-  if (m.type == "modbus_write") {
-    ESP_LOGD(TAG, "Modbus write command received (reg=%u val=%u) – handler not implemented yet",
-             m.reg, value);
-    return;
-  }
-
-  if (m.type == "script") {
-    if (m.script != nullptr && cmd == 0x03) {
-      ESP_LOGD(TAG, "Script execute: tgt=%u val=%u", target, value);
+    if (m.script != nullptr && cmd == 0x01) {
+      // Script<> has no args in this generic form
       m.script->execute();
     }
-    return;
+  } else if (m.type == "shelly_all") {
+    if (m.light != nullptr && cmd == 0x01) {
+      auto call = m.light->make_call();
+      call.set_brightness(value / 255.0f);
+      call.perform();
+    }
+    if (m.script != nullptr && cmd == 0x01) {
+      m.script->execute();
+    }
+  } else if (m.type == "neopixel_brightness") {
+    if (m.light != nullptr && cmd == 0x01) {
+      auto call = m.light->make_call();
+      call.set_brightness(value / 255.0f);
+      call.perform();
+    }
+  } else if (m.type == "switch_toggle") {
+    if (m.sw != nullptr && cmd == 0x02) {
+      m.sw->toggle();
+    }
+  } else if (m.type == "number_set") {
+    if (m.number != nullptr && cmd == 0x02) {
+      m.number->publish_state(value);
+    }
+  } else if (m.type == "modbus_write") {
+    if (m.ctrl != nullptr && cmd == 0x03) {
+      // Use an API that exists on your ModbusController version.
+      // If write_single_register is available, swap this line accordingly.
+      m.ctrl->write_single_coil(m.reg, value != 0);
+    }
+  } else if (m.type == "script") {
+    if (m.script != nullptr) {
+      m.script->execute();
+    }
+  } else {
+    ESP_LOGW(TAG, "Unknown mapping type '%s'", m.type.c_str());
   }
-
-  ESP_LOGW(TAG, "Unknown mapping type: %s", m.type.c_str());
 }
 
 }  // namespace canreceiver
