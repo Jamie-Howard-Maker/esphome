@@ -9,7 +9,7 @@
 #include "esphome/components/modbus_controller/modbus_controller.h"
 
 namespace esphome {
-namespace can_receiver {
+namespace canreceiver {
 
 struct CanMapping {
   uint32_t can_id;
