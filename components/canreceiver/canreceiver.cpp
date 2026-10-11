@@ -10,13 +10,13 @@ void CanReceiver::loop() {
   if (this->bus_ == nullptr)
     return;
 
-  canbus::CANFrame frame;
+  esp32_can::CanFrame frame;
   while (this->bus_->receive(&frame)) {
     this->process_frame(frame);
   }
 }
 
-void CanReceiver::process_frame(const canbus::CANFrame &frame) {
+void CanReceiver::process_frame(const esp32_can::CanFrame &frame) {
   if (frame.data.size() < 4)
     return;
 
@@ -39,7 +39,6 @@ void CanReceiver::process_frame(const canbus::CANFrame &frame) {
 void CanReceiver::execute_mapping(const CanMapping &m, uint8_t cmd,
                                   uint8_t target, uint8_t value,
                                   uint8_t flags) {
-  // Uniform payload:
   // cmd   = Byte 0 (command type)
   // target= Byte 1 (channel/entity index)
   // value = Byte 2 (0–255)
@@ -51,7 +50,7 @@ void CanReceiver::execute_mapping(const CanMapping &m, uint8_t cmd,
       if (value > 100)
         value = 100;
       ESP_LOGD(TAG, "Shelly channel: ch=%u val=%u", ch, value);
-      m.script->execute({ch, value});
+      m.script->execute(ch, value);
     }
     return;
   }
@@ -61,7 +60,7 @@ void CanReceiver::execute_mapping(const CanMapping &m, uint8_t cmd,
       if (value > 100)
         value = 100;
       ESP_LOGD(TAG, "Shelly all: val=%u", value);
-      m.script->execute({value});
+      m.script->execute(value);
     }
     return;
   }
@@ -100,7 +99,7 @@ void CanReceiver::execute_mapping(const CanMapping &m, uint8_t cmd,
   if (m.type == "modbus_write") {
     if (m.ctrl != nullptr && cmd == 0x07) {
       ESP_LOGD(TAG, "Modbus write: reg=%u val=%u", m.reg, value);
-      m.ctrl->write_single_register(m.reg, value);
+      m.ctrl->write_single_coil(m.reg, value != 0);
     }
     return;
   }
@@ -108,7 +107,7 @@ void CanReceiver::execute_mapping(const CanMapping &m, uint8_t cmd,
   if (m.type == "script") {
     if (m.script != nullptr && cmd == 0x03) {
       ESP_LOGD(TAG, "Script execute: target=%u val=%u", target, value);
-      m.script->execute({});
+      m.script->execute();
     }
     return;
   }
@@ -116,5 +115,5 @@ void CanReceiver::execute_mapping(const CanMapping &m, uint8_t cmd,
   ESP_LOGW(TAG, "Unknown mapping type: %s", m.type.c_str());
 }
 
-}  // namespace can_receiver
+}  // namespace canreceiver
 }  // namespace esphome
