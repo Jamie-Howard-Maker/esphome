@@ -1,53 +1,58 @@
 #include "canreceiver.h"
-#include "esphome/core/log.h"
 
 namespace esphome {
 namespace canreceiver {
 
 static const char *const TAG = "canreceiver";
 
-void CanReceiver::loop() {
-  if (this->bus_ == nullptr)
+void CanReceiver::setup() {
+  if (bus_ == nullptr) {
+    ESP_LOGW(TAG, "CAN receiver: no CAN bus configured");
     return;
-
-  canbus::CanFrame frame;
-  while (this->bus_->read_frame(&frame)) {
-    this->process_frame(frame);
   }
+
+  // ESP32Can provides on-frame callback
+  bus_->add_on_frame_callback([this](const esp32_can::CanFrame &frame) {
+    this->process_frame(frame);
+  });
+
+  ESP_LOGI(TAG, "CAN receiver initialized");
 }
 
-void CanReceiver::process_frame(const canbus::CanFrame &frame) {
-  if (frame.data_length < 4)
-    return;
+void CanReceiver::process_frame(const esp32_can::CanFrame &frame) {
+  // Expect at least 4 bytes: cmd, b0, b1, b2
+  uint8_t cmd = frame.data[0];
+  uint8_t b0  = frame.data[1];
+  uint8_t b1  = frame.data[2];
+  uint8_t b2  = frame.data[3];
 
-  uint8_t cmd    = frame.data[0];
-  uint8_t target = frame.data[1];
-  uint8_t value  = frame.data[2];
-  uint8_t flags  = frame.data[3];
+  ESP_LOGD(TAG, "RX CAN ID=0x%03X cmd=%u b0=%u b1=%u b2=%u",
+           frame.can_id, cmd, b0, b1, b2);
 
-  for (auto &m : this->mappings_) {
+  for (auto &m : mappings_) {
     if (m.can_id == frame.can_id) {
-      this->execute_mapping(m, cmd, target, value, flags);
+      this->execute_mapping(m, cmd, b0, b1, b2);
     }
   }
 }
 
 void CanReceiver::execute_mapping(const CanMapping &m,
-                                  uint8_t cmd, uint8_t target,
-                                  uint8_t value, uint8_t flags) {
-  ESP_LOGD(TAG, "Mapping type=%s cmd=%u target=%u value=%u flags=%u",
-           m.type.c_str(), cmd, target, value, flags);
+                                  uint8_t cmd,
+                                  uint8_t b0,
+                                  uint8_t b1,
+                                  uint8_t b2) {
+  uint16_t value = (uint16_t(b0) << 8) | b1;
 
   // Shelly channel brightness
-  if (m.type == "shelly_channel") {
+  if (m.type == CAN_RECEIVER_TYPE_SHELLY_CHANNEL) {
     if (m.script != nullptr && cmd == 0x01) {
-      m.script->execute();  // Script<> cannot take parameters in C++
+      m.script->execute();
     }
     return;
   }
 
   // Shelly all channels
-  if (m.type == "shelly_all") {
+  if (m.type == CAN_RECEIVER_TYPE_SHELLY_ALL) {
     if (m.script != nullptr && cmd == 0x01) {
       m.script->execute();
     }
@@ -55,9 +60,9 @@ void CanReceiver::execute_mapping(const CanMapping &m,
   }
 
   // NeoPixel brightness
-  if (m.type == "neopixel_brightness") {
+  if (m.type == CAN_RECEIVER_TYPE_NEOPIXEL_BRIGHTNESS) {
     if (m.light != nullptr && cmd == 0x01) {
-      float br = value / 255.0f;
+      float br = value / 100.0f;
       auto call = m.light->make_call();
       call.set_brightness(br);
       call.perform();
@@ -66,7 +71,7 @@ void CanReceiver::execute_mapping(const CanMapping &m,
   }
 
   // Switch toggle
-  if (m.type == "switch_toggle") {
+  if (m.type == CAN_RECEIVER_TYPE_SWITCH_TOGGLE) {
     if (m.sw != nullptr && cmd == 0x02) {
       m.sw->toggle();
     }
@@ -74,28 +79,32 @@ void CanReceiver::execute_mapping(const CanMapping &m,
   }
 
   // Number set
-  if (m.type == "number_set") {
-    if (m.num != nullptr && cmd == 0x04) {
-      m.num->publish_state(value);
+  if (m.type == CAN_RECEIVER_TYPE_NUMBER_SET) {
+    if (m.num != nullptr && cmd == 0x03) {
+      m.num->publish_state(static_cast<float>(value));
     }
     return;
   }
 
-  // Modbus write (disabled until correct API known)
-  if (m.type == "modbus_write") {
-    ESP_LOGW(TAG, "modbus_write mapping present but no valid Modbus API available");
+  // Modbus write
+  if (m.type == CAN_RECEIVER_TYPE_MODBUS_WRITE) {
+    if (m.ctrl != nullptr && cmd == 0x04) {
+      if (m.coil) {
+        m.ctrl->write_coil(m.reg, value != 0);
+      } else {
+        m.ctrl->write_register(m.reg, value);
+      }
+    }
     return;
   }
 
   // Script trigger
-  if (m.type == "script") {
-    if (m.script != nullptr && cmd == 0x03) {
+  if (m.type == CAN_RECEIVER_TYPE_SCRIPT) {
+    if (m.script != nullptr && cmd == 0x01) {
       m.script->execute();
     }
     return;
   }
-
-  ESP_LOGW(TAG, "Unknown mapping type: %s", m.type.c_str());
 }
 
 }  // namespace canreceiver
