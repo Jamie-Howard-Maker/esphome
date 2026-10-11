@@ -5,8 +5,10 @@ from esphome.const import CONF_ID
 # ESPHome does NOT define this constant, so we define it ourselves
 CONF_CANBUS_ID = "canbus_id"
 
-DEPENDENCIES = ["canbus"]
-AUTO_LOAD = ["canbus"]
+# MUST match the actual CAN implementation you use:
+# esp32_can::ESP32Can  (NOT canbus::CANBus)
+DEPENDENCIES = ["esp32_can"]
+AUTO_LOAD = ["esp32_can"]
 
 canreceiver_ns = cg.esphome_ns.namespace("canreceiver")
 CanReceiver = canreceiver_ns.class_("CanReceiver", cg.Component)
@@ -34,29 +36,39 @@ CAN_RECEIVER_TYPES = [
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(CanReceiver),
+
+        # Correct class for ESP32 TWAI CAN driver
         cv.Required(CONF_CANBUS_ID): cv.use_id(
-            cg.esphome_ns.namespace("canbus").class_("CANBus")
+            cg.esphome_ns.namespace("esp32_can").class_("ESP32Can")
         ),
+
         cv.Optional(CONF_MAPPINGS, default=[]): cv.ensure_list(
             cv.Schema(
                 {
                     cv.Required(CONF_CAN_ID): cv.int_range(min=0, max=0x7FF),
                     cv.Required(CONF_TYPE): cv.one_of(*CAN_RECEIVER_TYPES, lower=True),
+
                     cv.Optional(CONF_SCRIPT): cv.use_id(
                         cg.esphome_ns.namespace("script").class_("Script")
                     ),
+
                     cv.Optional(CONF_LIGHT): cv.use_id(
                         cg.esphome_ns.namespace("light").class_("LightState")
                     ),
+
+                    # Correct namespace: "switch", NOT "switch_"
                     cv.Optional(CONF_SWITCH): cv.use_id(
                         cg.esphome_ns.namespace("switch").class_("Switch")
                     ),
+
                     cv.Optional(CONF_NUMBER): cv.use_id(
                         cg.esphome_ns.namespace("number").class_("Number")
                     ),
+
                     cv.Optional(CONF_MODBUS_CONTROLLER): cv.use_id(
                         cg.esphome_ns.namespace("modbus_controller").class_("ModbusController")
                     ),
+
                     cv.Optional(CONF_REGISTER): cv.int_,
                 }
             )
@@ -69,6 +81,7 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
+    # Correct CAN class binding
     canbus = await cg.get_variable(config[CONF_CANBUS_ID])
     cg.add(var.set_canbus(canbus))
 
