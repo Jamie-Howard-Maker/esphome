@@ -2,6 +2,7 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/esp32_can/esp32_can.h"
+#include "esphome/components/canbus/canbus.h"
 #include "esphome/components/script/script.h"
 #include "esphome/components/light/light_state.h"
 #include "esphome/components/switch/switch.h"
@@ -24,7 +25,7 @@ struct CanMapping {
 
 class CanReceiver : public Component {
  public:
-  // Use ESP32Can, not generic CANBus
+  // Bind to ESP32Can (your YAML uses esp32_can)
   void set_canbus(esp32_can::ESP32Can *bus) { this->bus_ = bus; }
 
   void add_mapping(uint32_t can_id, const std::string &type,
@@ -49,7 +50,7 @@ class CanReceiver : public Component {
   esp32_can::ESP32Can *bus_{nullptr};
   std::vector<CanMapping> mappings_;
 
-  void process_frame(const esp32_can::CanFrame &frame);
+  void process_frame(const canbus::CanFrame &frame);
   void execute_mapping(const CanMapping &m, uint8_t cmd, uint8_t target,
                        uint8_t value, uint8_t flags);
 };
