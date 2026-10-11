@@ -10,18 +10,16 @@ void CanReceiver::loop() {
   if (this->bus_ == nullptr)
     return;
 
-  // ESPHome CAN frame type
   canbus::CanFrame frame;
 
-  // ESP32Can uses read_frame(canbus::CanFrame *), inherited from canbus::Canbus
+  // read_frame() is on canbus::Canbus
   while (this->bus_->read_frame(&frame)) {
     this->process_frame(frame);
   }
 }
 
 void CanReceiver::process_frame(const canbus::CanFrame &frame) {
-  // Older ESPHome CANFrame doesn't expose data_length; assume at least 4 bytes
-  // and trust the sender to populate data[0..3].
+  // Assume at least 4 bytes in data[]
   uint8_t cmd    = frame.data[0];
   uint8_t target = frame.data[1];
   uint8_t value  = frame.data[2];
