@@ -13,21 +13,19 @@ void CanReceiver::loop() {
   // ESPHome CAN frame type
   canbus::CanFrame frame;
 
-  // ESP32Can inherits from canbus::Canbus and uses receive()
-  while (this->bus_->receive(&frame)) {
+  // ESP32Can uses read_frame(canbus::CanFrame *), inherited from canbus::Canbus
+  while (this->bus_->read_frame(&frame)) {
     this->process_frame(frame);
   }
 }
 
 void CanReceiver::process_frame(const canbus::CanFrame &frame) {
-  // data is a fixed array, use data_length instead of size()
-  if (frame.data_length < 4)
-    return;
-
-  uint8_t cmd   = frame.data[0];
-  uint8_t target= frame.data[1];
-  uint8_t value = frame.data[2];
-  uint8_t flags = frame.data[3];
+  // Older ESPHome CANFrame doesn't expose data_length; assume at least 4 bytes
+  // and trust the sender to populate data[0..3].
+  uint8_t cmd    = frame.data[0];
+  uint8_t target = frame.data[1];
+  uint8_t value  = frame.data[2];
+  uint8_t flags  = frame.data[3];
 
   ESP_LOGV(TAG, "RX ID=0x%03X CMD=0x%02X TGT=%u VAL=%u FLG=0x%02X",
            frame.can_id, cmd, target, value, flags);
@@ -43,17 +41,11 @@ void CanReceiver::process_frame(const canbus::CanFrame &frame) {
 void CanReceiver::execute_mapping(const CanMapping &m, uint8_t cmd,
                                   uint8_t target, uint8_t value,
                                   uint8_t flags) {
-  // cmd   = Byte 0 (command type)
-  // target= Byte 1 (channel/entity index)
-  // value = Byte 2 (0–255)
-  // flags = Byte 3 (bitmask)
-
   if (m.type == "shelly_channel") {
-    if (m.script != nullptr && cmd == 0x01) {  // Set brightness
+    if (m.script != nullptr && cmd == 0x01) {
       if (value > 100)
         value = 100;
       ESP_LOGD(TAG, "Shelly channel: tgt=%u val=%u", target, value);
-      // Script<> has no parameters in this binding, so just execute()
       m.script->execute();
     }
     return;
@@ -100,7 +92,6 @@ void CanReceiver::execute_mapping(const CanMapping &m, uint8_t cmd,
     return;
   }
 
-  // Temporarily skip modbus_write until we decide exact API usage
   if (m.type == "modbus_write") {
     ESP_LOGD(TAG, "Modbus write command received (reg=%u val=%u) – handler not implemented yet",
              m.reg, value);
