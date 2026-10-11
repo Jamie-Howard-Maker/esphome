@@ -5,7 +5,7 @@ from esphome.const import CONF_ID, CONF_CANBUS_ID
 DEPENDENCIES = ["canbus"]
 AUTO_LOAD = ["canbus"]
 
-can_receiver_ns = cg.esphome_ns.namespace("can_receiver")
+can_receiver_ns = cg.esphome_ns.namespace("canreceiver")
 CanReceiver = can_receiver_ns.class_("CanReceiver", cg.Component)
 
 CONF_MAPPINGS = "mappings"
