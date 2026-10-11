@@ -15,7 +15,7 @@ namespace canreceiver {
 struct CanMapping {
   uint32_t can_id;
   std::string type;
-  script::Script<> *script;                 // Script with no parameters
+  script::Script<> *script;
   light::LightState *light;
   switch_::Switch *sw;
   number::Number *num;
@@ -25,7 +25,7 @@ struct CanMapping {
 
 class CanReceiver : public Component {
  public:
-  // Bind to ESP32Can (your YAML uses esp32_can)
+  // YAML/Python use ESP32Can, but we store as generic CANBus
   void set_canbus(esp32_can::ESP32Can *bus) { this->bus_ = bus; }
 
   void add_mapping(uint32_t can_id, const std::string &type,
@@ -47,7 +47,7 @@ class CanReceiver : public Component {
   void loop() override;
 
  protected:
-  esp32_can::ESP32Can *bus_{nullptr};
+  canbus::Canbus *bus_{nullptr};
   std::vector<CanMapping> mappings_;
 
   void process_frame(const canbus::CanFrame &frame);
