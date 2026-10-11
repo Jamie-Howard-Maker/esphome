@@ -1,10 +1,10 @@
-#include "can_receiver.h"
+#include "canreceiver.h"
 #include "esphome/core/log.h"
 
 namespace esphome {
-namespace can_receiver {
+namespace canreceiver {
 
-static const char *const TAG = "can_receiver";
+static const char *const TAG = "canreceiver";
 
 void CanReceiver::loop() {
   if (this->bus_ == nullptr)
