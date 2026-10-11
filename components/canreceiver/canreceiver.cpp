@@ -55,63 +55,79 @@ void CanReceiver::process_frame(uint32_t can_id,
   }
 }
 
-void CanReceiver::execute_mapping(const CanMapping &m, uint8_t cmd,
-                                  uint8_t target, uint8_t value,
-                                  uint8_t flags) {
-  (void) flags;
-
-  if (m.type == "shelly_channel") {
-    if (m.light != nullptr && cmd == 0x01) {
-      auto call = m.light->make_call();
-      call.set_brightness(value / 255.0f);
-      call.perform();
+void CanReceiver::execute_mapping(const CanMapping &m,
+                                  uint8_t cmd, uint8_t target,
+                                  uint8_t value, uint8_t flags) {
+  // Shelly per‑channel brightness
+  if (m.type == CAN_RECEIVER_TYPE_SHELLY_CHANNEL) {
+    if (m.script != nullptr && cmd == 0x01) {  // Set brightness
+      uint8_t ch = target;
+      m.script->execute();  // Script has no parameters in ESPHome C++ API
     }
+    return;
+  }
+
+  // Shelly all‑channels brightness
+  if (m.type == CAN_RECEIVER_TYPE_SHELLY_ALL) {
     if (m.script != nullptr && cmd == 0x01) {
-      m.script->execute();
+      m.script->execute();  // Again, no arguments
     }
+    return;
+  }
 
-  } else if (m.type == "shelly_all") {
+  // NeoPixel brightness (mapped to a light)
+  if (m.type == CAN_RECEIVER_TYPE_NEOPIXEL_BRIGHTNESS) {
     if (m.light != nullptr && cmd == 0x01) {
+      float brightness = value / 255.0f;
       auto call = m.light->make_call();
-      call.set_brightness(value / 255.0f);
+      call.set_brightness(brightness);
       call.perform();
     }
-    if (m.script != nullptr && cmd == 0x01) {
-      m.script->execute();
-    }
+    return;
+  }
 
-  } else if (m.type == "neopixel_brightness") {
-    if (m.light != nullptr && cmd == 0x01) {
-      auto call = m.light->make_call();
-      call.set_brightness(value / 255.0f);
-      call.perform();
+  // Switch toggle
+  if (m.type == CAN_RECEIVER_TYPE_SWITCH_TOGGLE) {
+    if (m.switch_ != nullptr && cmd == 0x02) {  // Toggle
+      m.switch_->toggle();
     }
+    return;
+  }
 
-  } else if (m.type == "switch_toggle") {
-    if (m.sw != nullptr && cmd == 0x02) {
-      m.sw->toggle();
-    }
-
-  } else if (m.type == "number_set") {
-    if (m.number != nullptr && cmd == 0x02) {
+  // Number set
+  if (m.type == CAN_RECEIVER_TYPE_NUMBER_SET) {
+    if (m.number != nullptr && cmd == 0x01) {  // Set value
       m.number->publish_state(value);
     }
+    return;
+  }
 
-  } else if (m.type == "modbus_write") {
-    if (m.ctrl != nullptr && cmd == 0x03) {
-      // FIX: use existing ModbusController API
-      m.ctrl->write_single_register(m.reg, value);
+  // Modbus write (coil/register) – **fixed calls here**
+  if (m.type == CAN_RECEIVER_TYPE_MODBUS_WRITE) {
+    if (m.ctrl != nullptr) {
+      // flags bit 0: 0 = coil, 1 = register (example convention)
+      bool is_register = (flags & 0x01) != 0;
+
+      if (is_register) {
+        // OLD: m.ctrl->write_single_register(m.reg, value);
+        m.ctrl->write_register(m.reg, value);
+      } else {
+        // OLD: m.ctrl->write_single_coil(m.reg, value != 0);
+        m.ctrl->write_coil(m.reg, value != 0);
+      }
     }
+    return;
+  }
 
-  } else if (m.type == "script") {
-    if (m.script != nullptr) {
-      m.script->execute();
+  // Plain script trigger
+  if (m.type == CAN_RECEIVER_TYPE_SCRIPT) {
+    if (m.script != nullptr && cmd == 0x03) {
+      m.script->execute();  // no arguments
     }
-
-  } else {
-    ESP_LOGW(TAG, "Unknown mapping type '%s'", m.type.c_str());
+    return;
   }
 }
+
 
 }  // namespace canreceiver
 }  // namespace esphome
