@@ -10,19 +10,22 @@ void CanReceiver::loop() {
   if (this->bus_ == nullptr)
     return;
 
+  // ESPHome CAN frame type
   canbus::CanFrame frame;
-  // ESP32Can inherits from canbus::Canbus, so we use read_frame()
-  while (this->bus_->read_frame(&frame)) {
+
+  // ESP32Can inherits from canbus::Canbus and uses receive()
+  while (this->bus_->receive(&frame)) {
     this->process_frame(frame);
   }
 }
 
 void CanReceiver::process_frame(const canbus::CanFrame &frame) {
-  if (frame.data.size() < 4)
+  // data is a fixed array, use data_length instead of size()
+  if (frame.data_length < 4)
     return;
 
-  uint8_t cmd = frame.data[0];
-  uint8_t target = frame.data[1];
+  uint8_t cmd   = frame.data[0];
+  uint8_t target= frame.data[1];
   uint8_t value = frame.data[2];
   uint8_t flags = frame.data[3];
 
@@ -97,11 +100,10 @@ void CanReceiver::execute_mapping(const CanMapping &m, uint8_t cmd,
     return;
   }
 
+  // Temporarily skip modbus_write until we decide exact API usage
   if (m.type == "modbus_write") {
-    if (m.ctrl != nullptr && cmd == 0x07) {
-      ESP_LOGD(TAG, "Modbus write: reg=%u val=%u", m.reg, value);
-      m.ctrl->write_single_register(m.reg, value);
-    }
+    ESP_LOGD(TAG, "Modbus write command received (reg=%u val=%u) – handler not implemented yet",
+             m.reg, value);
     return;
   }
 
