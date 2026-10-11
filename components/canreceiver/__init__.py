@@ -1,12 +1,15 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.const import CONF_ID, CONF_CANBUS_ID
+from esphome.const import CONF_ID
+
+# ESPHome does NOT define this constant, so we define it ourselves
+CONF_CANBUS_ID = "canbus_id"
 
 DEPENDENCIES = ["canbus"]
 AUTO_LOAD = ["canbus"]
 
-can_receiver_ns = cg.esphome_ns.namespace("canreceiver")
-CanReceiver = can_receiver_ns.class_("CanReceiver", cg.Component)
+canreceiver_ns = cg.esphome_ns.namespace("canreceiver")
+CanReceiver = canreceiver_ns.class_("CanReceiver", cg.Component)
 
 CONF_MAPPINGS = "mappings"
 CONF_CAN_ID = "can_id"
@@ -31,16 +34,26 @@ CAN_RECEIVER_TYPES = [
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(CanReceiver),
-        cv.Required(CONF_CANBUS_ID): cv.use_id(cg.esphome_ns.namespace("canbus").class_("CANBus")),
+        cv.Required(CONF_CANBUS_ID): cv.use_id(
+            cg.esphome_ns.namespace("canbus").class_("CANBus")
+        ),
         cv.Optional(CONF_MAPPINGS, default=[]): cv.ensure_list(
             cv.Schema(
                 {
                     cv.Required(CONF_CAN_ID): cv.int_range(min=0, max=0x7FF),
                     cv.Required(CONF_TYPE): cv.one_of(*CAN_RECEIVER_TYPES, lower=True),
-                    cv.Optional(CONF_SCRIPT): cv.use_id(cg.esphome_ns.namespace("script").class_("Script")),
-                    cv.Optional(CONF_LIGHT): cv.use_id(cg.esphome_ns.namespace("light").class_("LightState")),
-                    cv.Optional(CONF_SWITCH): cv.use_id(cg.esphome_ns.namespace("switch_").class_("Switch")),
-                    cv.Optional(CONF_NUMBER): cv.use_id(cg.esphome_ns.namespace("number").class_("Number")),
+                    cv.Optional(CONF_SCRIPT): cv.use_id(
+                        cg.esphome_ns.namespace("script").class_("Script")
+                    ),
+                    cv.Optional(CONF_LIGHT): cv.use_id(
+                        cg.esphome_ns.namespace("light").class_("LightState")
+                    ),
+                    cv.Optional(CONF_SWITCH): cv.use_id(
+                        cg.esphome_ns.namespace("switch").class_("Switch")
+                    ),
+                    cv.Optional(CONF_NUMBER): cv.use_id(
+                        cg.esphome_ns.namespace("number").class_("Number")
+                    ),
                     cv.Optional(CONF_MODBUS_CONTROLLER): cv.use_id(
                         cg.esphome_ns.namespace("modbus_controller").class_("ModbusController")
                     ),
